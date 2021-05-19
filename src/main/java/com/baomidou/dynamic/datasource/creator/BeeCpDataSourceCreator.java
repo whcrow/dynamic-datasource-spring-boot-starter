@@ -39,7 +39,7 @@ import static com.baomidou.dynamic.datasource.support.DdConstants.BEECP_DATASOUR
 @Slf4j
 @Data
 @AllArgsConstructor
-public class BeeCpDataSourceCreator implements DataSourceCreator {
+public class BeeCpDataSourceCreator extends AbstractDataSourceCreator implements DataSourceCreator {
 
     private static Boolean beeCpExists = false;
     private static Method copyToMethod = null;
@@ -59,9 +59,13 @@ public class BeeCpDataSourceCreator implements DataSourceCreator {
     @Override
     public DataSource createDataSource(DataSourceProperty dataSourceProperty) {
         BeeDataSourceConfig config = dataSourceProperty.getBeecp().toBeeCpConfig(beeCpConfig);
-        config.setUsername(dataSourceProperty.getUsername());
-        config.setPassword(dataSourceProperty.getPassword());
-        config.setJdbcUrl(dataSourceProperty.getUrl());
+        String publicKey = dataSourceProperty.getPublicKey();
+        String url = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getUrl());
+        String username = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getUsername());
+        String password = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getPassword());
+        config.setJdbcUrl(url);
+        config.setUsername(username);
+        config.setPassword(password);
         config.setPoolName(dataSourceProperty.getPoolName());
         String driverClassName = dataSourceProperty.getDriverClassName();
         if (!StringUtils.isEmpty(driverClassName)) {

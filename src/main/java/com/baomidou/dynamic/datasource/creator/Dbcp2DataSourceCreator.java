@@ -32,7 +32,7 @@ import static com.baomidou.dynamic.datasource.support.DdConstants.DBCP2_DATASOUR
  * @since 2020/1/21
  */
 @Data
-public class Dbcp2DataSourceCreator implements DataSourceCreator {
+public class Dbcp2DataSourceCreator extends AbstractDataSourceCreator implements DataSourceCreator {
 
     private static Boolean dbcp2Exists = false;
 
@@ -54,9 +54,13 @@ public class Dbcp2DataSourceCreator implements DataSourceCreator {
     public DataSource createDataSource(DataSourceProperty dataSourceProperty) {
         Dbcp2Config config = dataSourceProperty.getDbcp2();
         BasicDataSource dataSource = config.toDbcpDataSource(gConfig);
-        dataSource.setUsername(dataSourceProperty.getUsername());
-        dataSource.setPassword(dataSourceProperty.getPassword());
-        dataSource.setUrl(dataSourceProperty.getUrl());
+        String publicKey = dataSourceProperty.getPublicKey();
+        String url = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getUrl());
+        String username = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getUsername());
+        String password = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getPassword());
+        dataSource.setUrl(url);
+        dataSource.setUsername(username);
+        dataSource.setPassword(password);
         String driverClassName = dataSourceProperty.getDriverClassName();
         if (!StringUtils.isEmpty(driverClassName)) {
             dataSource.setDriverClassName(driverClassName);

@@ -18,6 +18,8 @@ package com.baomidou.dynamic.datasource.spring.boot.autoconfigure;
 import cn.beecp.BeeDataSource;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.baomidou.dynamic.datasource.creator.*;
+import com.baomidou.dynamic.datasource.crypto.DataSourceCropto;
+import com.baomidou.dynamic.datasource.crypto.DefaultDataSourceCropto;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +51,12 @@ public class DynamicDataSourceCreatorAutoConfiguration {
     public static final int DEFAULT_ORDER = 6000;
 
     private final DynamicDataSourceProperties properties;
+
+    @Bean
+    @ConditionalOnMissingBean
+    public DataSourceCropto dataSourceCropto() {
+        return new DefaultDataSourceCropto();
+    }
 
     @Primary
     @Bean

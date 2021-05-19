@@ -46,7 +46,7 @@ import static com.baomidou.dynamic.datasource.support.DdConstants.DRUID_DATASOUR
  * @since 2020/1/21
  */
 @Data
-public class DruidDataSourceCreator implements DataSourceCreator {
+public class DruidDataSourceCreator extends AbstractDataSourceCreator implements DataSourceCreator {
 
     private static Boolean druidExists = false;
 
@@ -70,9 +70,13 @@ public class DruidDataSourceCreator implements DataSourceCreator {
     @Override
     public DataSource createDataSource(DataSourceProperty dataSourceProperty) {
         DruidDataSource dataSource = new DruidDataSource();
-        dataSource.setUsername(dataSourceProperty.getUsername());
-        dataSource.setPassword(dataSourceProperty.getPassword());
-        dataSource.setUrl(dataSourceProperty.getUrl());
+        String publicKey = dataSourceProperty.getPublicKey();
+        String url = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getUrl());
+        String username = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getUsername());
+        String password = dataSourceCropto.decrypt(publicKey, dataSourceProperty.getPassword());
+        dataSource.setUrl(url);
+        dataSource.setUsername(username);
+        dataSource.setPassword(password);
         dataSource.setName(dataSourceProperty.getPoolName());
         String driverClassName = dataSourceProperty.getDriverClassName();
         if (!StringUtils.isEmpty(driverClassName)) {
