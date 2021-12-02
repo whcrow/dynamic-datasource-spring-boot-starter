@@ -13,26 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.baomidou.dynamic.datasource.annotation;
+package com.baomidou.dynamic.datasource.spring.boot.autoconfigure;
 
-
-import java.lang.annotation.*;
+import lombok.Data;
+import org.springframework.core.Ordered;
 
 /**
- * The core Annotation to switch datasource. It can be annotated at class or method.
+ * 多数据源aop相关配置
  *
- * @author TaoYu Kanyuxia
- * @since 1.0.0
+ * @author TaoYu
  */
-@Target({ElementType.TYPE, ElementType.METHOD})
-@Retention(RetentionPolicy.RUNTIME)
-@Documented
-public @interface DS {
+@Data
+public class DynamicDatasourceAopProperties {
 
     /**
-     * groupName or specific database name or spring SPEL name.
-     *
-     * @return the database you want to switch
+     * enabled default DS annotation default true
      */
-    String value();
+    private Boolean enabled = true;
+    /**
+     * aop order
+     */
+    private Integer order = Ordered.HIGHEST_PRECEDENCE;
+    /**
+     * aop allowedPublicOnly
+     */
+    private Boolean allowedPublicOnly = true;
 }

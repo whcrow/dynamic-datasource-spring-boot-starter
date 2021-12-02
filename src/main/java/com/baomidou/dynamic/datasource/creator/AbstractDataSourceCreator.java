@@ -17,50 +17,68 @@ package com.baomidou.dynamic.datasource.creator;
 
 import com.baomidou.dynamic.datasource.ds.ItemDataSource;
 import com.baomidou.dynamic.datasource.enums.SeataMode;
+import com.baomidou.dynamic.datasource.event.DataSourceInitEvent;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
+import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DatasourceInitProperties;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceProperties;
 import com.baomidou.dynamic.datasource.support.ScriptRunner;
 import com.p6spy.engine.spy.P6DataSource;
 import io.seata.rm.datasource.DataSourceProxy;
 import io.seata.rm.datasource.xa.DataSourceProxyXA;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
 
+/**
+ * 抽象连接池创建器
+ * <p>
+ * 这里主要处理一些公共逻辑，如脚本和事件等
+ *
+ * @author TaoYu
+ */
 @Slf4j
-public abstract class AbstractDataSourceCreator {
+public abstract class AbstractDataSourceCreator implements DataSourceCreator {
 
-    protected final DynamicDataSourceProperties dynamicDataSourceProperties;
+    @Autowired
+    protected DynamicDataSourceProperties properties;
+    @Autowired
+    protected DataSourceInitEvent dataSourceInitEvent;
 
-    protected AbstractDataSourceCreator(DynamicDataSourceProperties dynamicDataSourceProperties) {
-        this.dynamicDataSourceProperties = dynamicDataSourceProperties;
-    }
-
+    /**
+     * 子类去实际创建连接池
+     *
+     * @param dataSourceProperty 数据源信息
+     * @return 实际连接池
+     */
     public abstract DataSource doCreateDataSource(DataSourceProperty dataSourceProperty);
 
+    @Override
     public DataSource createDataSource(DataSourceProperty dataSourceProperty) {
         String publicKey = dataSourceProperty.getPublicKey();
         if (StringUtils.isEmpty(publicKey)) {
-            publicKey = dynamicDataSourceProperties.getPublicKey();
+            publicKey = properties.getPublicKey();
             dataSourceProperty.setPublicKey(publicKey);
         }
-
         Boolean lazy = dataSourceProperty.getLazy();
         if (lazy == null) {
-            lazy = dynamicDataSourceProperties.getLazy();
+            lazy = properties.getLazy();
             dataSourceProperty.setLazy(lazy);
         }
+        dataSourceInitEvent.beforeCreate(dataSourceProperty);
         DataSource dataSource = doCreateDataSource(dataSourceProperty);
+        dataSourceInitEvent.afterCreate(dataSource);
         this.runScrip(dataSource, dataSourceProperty);
         return wrapDataSource(dataSource, dataSourceProperty);
     }
 
     private void runScrip(DataSource dataSource, DataSourceProperty dataSourceProperty) {
-        String schema = dataSourceProperty.getSchema();
-        String data = dataSourceProperty.getData();
+        DatasourceInitProperties initProperty = dataSourceProperty.getInit();
+        String schema = initProperty.getSchema();
+        String data = initProperty.getData();
         if (StringUtils.hasText(schema) || StringUtils.hasText(data)) {
-            ScriptRunner scriptRunner = new ScriptRunner(dataSourceProperty.isContinueOnError(), dataSourceProperty.getSeparator());
+            ScriptRunner scriptRunner = new ScriptRunner(initProperty.isContinueOnError(), initProperty.getSeparator());
             if (StringUtils.hasText(schema)) {
                 scriptRunner.runScript(dataSource, schema);
             }
@@ -74,19 +92,19 @@ public abstract class AbstractDataSourceCreator {
         String name = dataSourceProperty.getPoolName();
         DataSource targetDataSource = dataSource;
 
-        Boolean enabledP6spy = dynamicDataSourceProperties.getP6spy() && dataSourceProperty.getP6spy();
+        Boolean enabledP6spy = properties.getP6spy() && dataSourceProperty.getP6spy();
         if (enabledP6spy) {
             targetDataSource = new P6DataSource(dataSource);
             log.debug("dynamic-datasource [{}] wrap p6spy plugin", name);
         }
 
-        Boolean enabledSeata = dynamicDataSourceProperties.getSeata() && dataSourceProperty.getSeata();
-        SeataMode seataMode = dynamicDataSourceProperties.getSeataMode();
+        Boolean enabledSeata = properties.getSeata() && dataSourceProperty.getSeata();
+        SeataMode seataMode = properties.getSeataMode();
         if (enabledSeata) {
             if (SeataMode.XA == seataMode) {
-                targetDataSource = new DataSourceProxyXA(dataSource);
+                targetDataSource = new DataSourceProxyXA(targetDataSource);
             } else {
-                targetDataSource = new DataSourceProxy(dataSource);
+                targetDataSource = new DataSourceProxy(targetDataSource);
             }
             log.debug("dynamic-datasource [{}] wrap seata plugin transaction mode ", name);
         }

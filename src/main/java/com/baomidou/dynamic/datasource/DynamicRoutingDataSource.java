@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
@@ -51,7 +52,7 @@ public class DynamicRoutingDataSource extends AbstractRoutingDataSource implemen
 
     private static final String UNDERLINE = "_";
     /**
-     * 所有数据库¬
+     * 所有数据库
      */
     private final Map<String, DataSource> dataSourceMap = new ConcurrentHashMap<>();
     /**
@@ -91,34 +92,12 @@ public class DynamicRoutingDataSource extends AbstractRoutingDataSource implemen
     }
 
     /**
-     * 获取当前所有的数据源
-     * please use getDataSources()
-     *
-     * @return 当前所有数据源
-     */
-    @Deprecated
-    public Map<String, DataSource> getCurrentDataSources() {
-        return dataSourceMap;
-    }
-
-    /**
      * 获取所有的数据源
      *
      * @return 当前所有数据源
      */
     public Map<String, DataSource> getDataSources() {
         return dataSourceMap;
-    }
-
-    /**
-     * 获取的当前所有的分组数据源
-     * please use getGroupDataSources()
-     *
-     * @return 当前所有的分组数据源
-     */
-    @Deprecated
-    public Map<String, GroupDataSource> getCurrentGroupDataSources() {
-        return groupDataSources;
     }
 
     /**
@@ -235,7 +214,7 @@ public class DynamicRoutingDataSource extends AbstractRoutingDataSource implemen
         // 检查开启了配置但没有相关依赖
         checkEnv();
         // 添加并分组数据源
-        Map<String, DataSource> dataSources = new HashMap<>();
+        Map<String, DataSource> dataSources = new HashMap<>(16);
         for (DynamicDataSourceProvider provider : providers) {
             dataSources.putAll(provider.loadDataSources());
         }
@@ -295,16 +274,7 @@ public class DynamicRoutingDataSource extends AbstractRoutingDataSource implemen
                         dataSource = (DataSource) realDataSourceField.get(dataSource);
                     }
                 }
-                
-                Method closeMethod = null;
-                for(Class<?> clazz = dataSource.getClass(); clazz != Object.class; clazz = clazz.getSuperclass()) {  
-                    try {  
-                        closeMethod = clazz.getDeclaredMethod("close");
-                        if (closeMethod != null) {
-                            break;
-                        }
-                    } catch (Exception ignored){}  
-                }
+                Method closeMethod = ReflectionUtils.findMethod(dataSource.getClass(), "close");
                 if (closeMethod != null) {
                     closeMethod.invoke(dataSource);
                 }

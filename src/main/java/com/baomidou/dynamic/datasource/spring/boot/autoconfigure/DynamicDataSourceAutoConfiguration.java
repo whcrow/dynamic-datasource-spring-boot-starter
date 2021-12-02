@@ -16,9 +16,13 @@
 package com.baomidou.dynamic.datasource.spring.boot.autoconfigure;
 
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
+import com.baomidou.dynamic.datasource.annotation.DS;
+import com.baomidou.dynamic.datasource.annotation.DSTransactional;
 import com.baomidou.dynamic.datasource.aop.DynamicDataSourceAnnotationAdvisor;
 import com.baomidou.dynamic.datasource.aop.DynamicDataSourceAnnotationInterceptor;
-import com.baomidou.dynamic.datasource.aop.DynamicLocalTransactionAdvisor;
+import com.baomidou.dynamic.datasource.aop.DynamicLocalTransactionInterceptor;
+import com.baomidou.dynamic.datasource.event.DataSourceInitEvent;
+import com.baomidou.dynamic.datasource.event.EncDataSourceInitEvent;
 import com.baomidou.dynamic.datasource.processor.DsHeaderProcessor;
 import com.baomidou.dynamic.datasource.processor.DsProcessor;
 import com.baomidou.dynamic.datasource.processor.DsSessionProcessor;
@@ -29,8 +33,6 @@ import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.druid.DruidDyna
 import com.baomidou.dynamic.datasource.strategy.DynamicDataSourceStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.Advisor;
-import org.springframework.aop.aspectj.AspectJExpressionPointcut;
-import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -63,7 +65,7 @@ import java.util.List;
 @Configuration
 @EnableConfigurationProperties(DynamicDataSourceProperties.class)
 @AutoConfigureBefore(value = DataSourceAutoConfiguration.class, name = "com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure")
-@Import(value = {DruidDynamicDataSourceConfiguration.class, DynamicDataSourceCreatorAutoConfiguration.class, DynamicDataSourceHealthCheckConfiguration.class})
+@Import(value = {DruidDynamicDataSourceConfiguration.class, DynamicDataSourceCreatorAutoConfiguration.class})
 @ConditionalOnProperty(prefix = DynamicDataSourceProperties.PREFIX, name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DynamicDataSourceAutoConfiguration implements InitializingBean {
 
@@ -95,23 +97,29 @@ public class DynamicDataSourceAutoConfiguration implements InitializingBean {
         return dataSource;
     }
 
-    @Role(value = BeanDefinition.ROLE_INFRASTRUCTURE)
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     @Bean
-    @ConditionalOnProperty(prefix = DynamicDataSourceProperties.PREFIX, name = "defaultAnnotation", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnProperty(prefix = DynamicDataSourceProperties.PREFIX + ".aop", name = "enabled", havingValue = "true", matchIfMissing = true)
     public Advisor dynamicDatasourceAnnotationAdvisor(DsProcessor dsProcessor) {
-        DynamicDataSourceAnnotationInterceptor interceptor = new DynamicDataSourceAnnotationInterceptor(properties.isAllowedPublicOnly(), dsProcessor);
-        DynamicDataSourceAnnotationAdvisor advisor = new DynamicDataSourceAnnotationAdvisor(interceptor);
-        advisor.setOrder(properties.getOrder());
+        DynamicDatasourceAopProperties aopProperties = properties.getAop();
+        DynamicDataSourceAnnotationInterceptor interceptor = new DynamicDataSourceAnnotationInterceptor(aopProperties.getAllowedPublicOnly(), dsProcessor);
+        DynamicDataSourceAnnotationAdvisor advisor = new DynamicDataSourceAnnotationAdvisor(interceptor, DS.class);
+        advisor.setOrder(aopProperties.getOrder());
         return advisor;
     }
 
-    @Role(value = BeanDefinition.ROLE_INFRASTRUCTURE)
-    @ConditionalOnProperty(prefix = DynamicDataSourceProperties.PREFIX, name = "seata", havingValue = "false", matchIfMissing = true)
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     @Bean
+    @ConditionalOnProperty(prefix = DynamicDataSourceProperties.PREFIX, name = "seata", havingValue = "false", matchIfMissing = true)
     public Advisor dynamicTransactionAdvisor() {
-        AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
-        pointcut.setExpression("@annotation(com.baomidou.dynamic.datasource.annotation.DSTransactional)");
-        return new DefaultPointcutAdvisor(pointcut, new DynamicLocalTransactionAdvisor());
+        DynamicLocalTransactionInterceptor interceptor = new DynamicLocalTransactionInterceptor();
+        return new DynamicDataSourceAnnotationAdvisor(interceptor, DSTransactional.class);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public DataSourceInitEvent dataSourceInitEvent() {
+        return new EncDataSourceInitEvent();
     }
 
     @Bean

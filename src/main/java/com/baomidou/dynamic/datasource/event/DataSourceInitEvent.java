@@ -13,19 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.baomidou.dynamic.datasource.spring.boot.autoconfigure.druid;
+package com.baomidou.dynamic.datasource.event;
 
-import lombok.Data;
+import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
+
+import javax.sql.DataSource;
 
 /**
- * Druid日志配置
+ * 多数据源连接池创建事件
  *
- * @author Lhx
+ * @author TaoYu
+ * @since 3.5.0
  */
-@Data
-public class DruidSlf4jConfig {
+public interface DataSourceInitEvent {
 
-    private Boolean enable = true;
+    /**
+     * 连接池创建前执行（可用于参数解密）
+     *
+     * @param dataSourceProperty 数据源基础信息
+     */
+    void beforeCreate(DataSourceProperty dataSourceProperty);
 
-    private Boolean statementExecutableSqlLogEnable = false;
+    /**
+     * 连接池创建后执行
+     *
+     * @param dataSource 连接池
+     */
+    void afterCreate(DataSource dataSource);
 }
